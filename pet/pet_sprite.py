@@ -837,10 +837,17 @@ class PetSprite(QObject):
         overlay 持有（同线程），直接连接即可，无需 queued。
         """
         if self._clip is not None:
-            self._disconnect_clip_signals(self._clip)
-            stop = getattr(self._clip, "stop", None)
-            if callable(stop):
-                stop()
+            # 旧 clip 的 C++ 对象可能已被销毁（热切换：旧库 shutdown 后包装壳被
+            # GC，sprite 仍握着死壳）——对死壳调 stop() 抛 RuntimeError 且会
+            # 顺着 Qt 槽吞掉，换绑永远完不成 = 桌宠冻结在旧角色最后一帧。
+            # 拆除失败安全跳过：信号已随对象消亡，新 clip 照常绑定。
+            try:
+                self._disconnect_clip_signals(self._clip)
+                stop = getattr(self._clip, "stop", None)
+                if callable(stop):
+                    stop()
+            except RuntimeError:
+                pass
         # 播放边界：此刻旧 clip 已 stop() 并断开信号 → 允许换后端（帧序列变可用）。
         # **取不到 clip 不能把异常抛进 Qt 槽**：菜单/快捷键是外部触发，槽里抛
         # KeyError 会被事件循环吞掉只留 traceback，用户看到的是"点了没反应"。
