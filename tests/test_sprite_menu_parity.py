@@ -82,6 +82,8 @@ REQUIRED_LABELS = (
     "主动识屏",
     "Agent 联动",
     "网络信息",
+    "Token 用量",
+    "息屏",
     "桌宠设置",
 )
 MUSIC_LABELS = (
@@ -98,7 +100,8 @@ CHAT_GATED_LABELS = ("AI 对话", "看看屏幕", "主动识屏", "DeepSeek 余�
 # proactive.py 仅 win32 起监视器），菜单注册处 shared.add_proactive_menu 与
 # registry proactive_screen 均按 sys.platform == "win32" 门控——posix 上
 # 两侧建造器都不产出该项，期望模板须按平台分流（test_menu_layout.py 同先例）。
-WIN32_ONLY_LABELS = ("主动识屏",)
+# 「息屏」同款平台门（SC_MONITORPOWER 广播仅 Windows）。
+WIN32_ONLY_LABELS = ("主动识屏", "息屏")
 
 
 # ---------------------------------------------------------------- 假件
@@ -129,6 +132,9 @@ class _StubAppShell:
 
     def open_network_info(self):
         self._record("open_network_info")
+
+    def show_usage_query(self, parent=None):
+        self._record("show_usage_query", parent)
 
     def trigger_voice_chime_now(self, text=""):
         self._record("trigger_voice_chime_now", text)
@@ -216,6 +222,7 @@ def _reference_window(config, *, chat=True):
     win.on_check_update = lambda parent=None: None
     win.on_open_todo_panel = lambda: None
     win.on_network_info = lambda: None
+    win.on_usage_query = lambda parent=None: None
     win.on_voice_chime_now = lambda text="": None
     win.on_toggle_voice_chime = lambda: None
     win.on_festival_now = lambda: None
@@ -696,6 +703,9 @@ def test_menu_routes_service_semantics(tmp_path, monkeypatch):
         # 网络信息 → AppShell.open_network_info（进程级弹窗，与作用对象无关）
         _require(menu, "网络信息").trigger()
         assert "open_network_info" in [call[0] for call in instance.shell.calls]
+        # ZCode 用量 → AppShell.show_usage_query（读本机用量库，气泡落发起 sprite）
+        _require(menu, "Token 用量").trigger()
+        assert "show_usage_query" in [call[0] for call in instance.shell.calls]
     finally:
         shell._delete_runtime_marker()
 

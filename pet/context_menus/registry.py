@@ -40,6 +40,7 @@ from .shared import (
     add_look_screen,
     add_memory_trim,
     add_monitor_sleep,
+    add_usage_query,
     add_agent_cost,
     add_music_lyric_align,
     add_music_next,
@@ -87,6 +88,7 @@ ACTION_LABELS = {
     "agent_cost": "显示本轮消费",
     "quick_launch": "快捷启动", "balance": "DeepSeek 余额",
     "memory_trim": "回收内存", "monitor_sleep": "息屏",
+    "usage_query": "Token 用量",
     "harness": "启动 DeepSeek Harness", "deepseek_web": "打开网页版 DeepSeek",
     "check_update": "检查更新", "github_project": "GitHub 项目页",
     "quark_download": "夸克网盘下载", "agent_link": "Agent 联动",
@@ -118,6 +120,7 @@ ACTION_ICONS = {
     "music_open_soda": "play", "music_lyric_align": "play",
     "quick_launch": "application", "balance": "balance", "harness": "harness",
     "memory_trim": "clear", "monitor_sleep": "screen",
+    "usage_query": "balance",
     "deepseek_web": "web", "check_update": "update", "github_project": "web",
     "quark_download": "download", "agent_link": "automation",
     "proactive_screen": "screen", "todo_panel": "todo",
@@ -363,6 +366,9 @@ class MenuActionRegistry:
             # builder 双门，非 Windows 整条不出现）。
             "monitor_sleep": MenuActionSpec(
                 add_monitor_sleep, _monitor_sleep_available,
+            ),
+            "usage_query": MenuActionSpec(
+                add_usage_query, _callback_available("on_usage_query"),
             ),
             "golden_spin": MenuActionSpec(
                 add_golden_spin,

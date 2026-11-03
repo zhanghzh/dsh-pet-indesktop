@@ -92,6 +92,13 @@ numpy>=1.26
 omegaconf>=2.3
 opencv-python-headless>=4.5.1.48
 
+# —— ZCode / DSH Token 用量播报（usage_report.py）——
+# zstandard：DSH 会话流水（~/.dsh/sessions/**/session.v4.jsonl.zstd）的解压。
+# DSH 每条 assistant/message 的 usage 都在流水里，按事件时间可以精确切出
+# "今天"（projcache 只有会话生命周期合计，跨天会话切不开）。没有 DSH 的
+# 机器缺失它只是 DSH 半边静默缺席，不影响 ZCode 半边（惰性导入）。
+zstandard>=0.23
+
 # —— 开发依赖（测试 + 静态检查）——
 # pytest：测试套件入口（README「测试与验证」与本仓库 CI 都依赖它）。
 # ruff：`ruff check pet/ tests/` 用的静态检查器（规则基线见 pyproject.toml

@@ -440,6 +440,20 @@ class SpriteMenuFacade:
         return _first_callable(self._hosts(), ("open_network_info",))
 
     @property
+    def on_usage_query(self):
+        """「ZCode 用量」：``AppShell.show_usage_query``（进程级服务，同 show_balance
+        的宿主口径——气泡落在发起 sprite 的呈现器上）。
+
+        数据来自本机 ZCode 用量库（``pet/usage_report.py``），与右击哪只宠无关；
+        回调缺失（纯桌宠变体 / 菜单接线被拆）时注册表判定整条不出现。
+        """
+        fn = _first_callable(self._hosts(), ("show_usage_query",))
+        if fn is None:
+            return None
+        host = self._service_host()
+        return lambda *_ignored: fn(host)
+
+    @property
     def on_voice_chime_now(self):
         return _first_callable(self._hosts(), ("trigger_voice_chime_now",))
 

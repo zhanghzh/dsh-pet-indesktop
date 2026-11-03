@@ -635,6 +635,9 @@ class PetInstance:
         # 网络信息（issue #172）：右键菜单入口 → 进程级弹窗（overlay 侧由
         # SpriteMenuFacade.on_network_info 走同一方法）。
         win.on_network_info = self._slot_wrap(self.shell.open_network_info)
+        # Token 用量查询：菜单点击即查 ZCode 库 + DSH 今日会话并冒泡（overlay 侧由
+        # SpriteMenuFacade.on_usage_query 走同一方法；气泡宿主 = 发起 sprite）。
+        win.on_usage_query = self._slot_wrap(self.shell.show_usage_query)
         win.on_voice_chime_now = self._slot_wrap(self.shell.trigger_voice_chime_now)
         win.on_toggle_voice_chime = self._slot_wrap(self.shell.toggle_voice_chime)
         # 点击自言自语的朗读走同一条音频通道（AppShell 持有，进程内唯一）。
@@ -4803,6 +4806,27 @@ class AppShell:
 
     def _todo_panel_finished(self, _result: int) -> None:
         self.todo_panel = None
+
+    def show_usage_query(self, parent=None) -> None:
+        """「Token 用量」：读 ZCode 用量库 + DSH 今日会话流水（精确 token 值）并气泡播报。
+
+        查询 <3ms（GUI 线程同步跑无感），失败/没装 ZCode 时气泡明说，不静默。
+        ``parent`` 同 ``show_balance`` 是气泡宿主（SpriteMenuFacade 传发起
+        sprite 的呈现器；win 直调路径传壳/窗），无可用宿主时回退 self.win。
+        """
+        win = parent
+        if win is None or not callable(getattr(win, "show_bubble", None)):
+            win = self.win
+        if win is None or not win.isVisible():
+            return
+        from . import usage_report
+
+        text = (usage_report.build_bubble_text()
+                or "今天两边的账单还都是空的……")
+        if text:
+            # 延迟到事件循环空闲：菜单触发器销毁期间冒泡在 macOS 上会被吞
+            # （与 show_balance 的 singleShot(0) 同一款规避）。
+            QTimer.singleShot(0, lambda: win.show_bubble(text, duration_ms=6000))
 
     def open_network_info(self) -> None:
         """打开「网络信息」弹窗（非模态单例；数据只在打开时取一次，不轮询）。"""

@@ -1394,6 +1394,8 @@ class OverlayShell(QObject):
         # 自言自语族（周期气泡 / 点击台词 / 配图 / 朗读）：旧架构唯一宿主是
         # PetWindow（window.py:458-480 + :740），overlay 拓扑下必须由本壳装配
         self._init_self_talk()
+        # ZCode 用量播报（每 5 分钟一条碎碎念：今日 token + 当前输出速度）
+        self._init_usage_report()
         # 音乐自动唱歌（M5f）：轮询定时器 + 唱歌续播链（extras 尾段观测唱歌结束）
         self._init_music_sing()
         self._music_sing_chain = _MusicSingChain(self)
@@ -2410,6 +2412,53 @@ class OverlayShell(QObject):
         self._self_talk_timer.timeout.connect(self._on_self_talk_timeout)
         self._schedule_self_talk()  # 首次排程（window.py:740）
 
+    def _init_usage_report(self) -> None:
+        """ZCode 用量播报：读 ``~/.zcode/cli/db/db.sqlite``（精确值，非网络估算）。
+
+        查询实测 <3ms（2900 行），GUI 线程同步跑无感；失败/库不存在静默跳过
+        （装饰功能不得拖累桌宠）。间隔可配 ``usage_report_minutes``（默认 5，
+        0 = 关）。只在主 sprite 可见时弹，不打断审批等挂着的气泡。
+        """
+        try:
+            minutes = float(self._config.get("usage_report_minutes", 5))
+        except (TypeError, ValueError):
+            minutes = 5.0
+        if minutes <= 0:
+            return
+        self._usage_report_timer = QTimer(self)
+        self._usage_report_timer.setSingleShot(True)
+        self._usage_report_timer.timeout.connect(self._on_usage_report_tick)
+        self._usage_report_timer.start(int(minutes * 60_000))
+
+    def _on_usage_report_tick(self) -> None:
+        """到点查一次用量并冒泡；下一轮在**气泡收起后**再排（见 _rearm）。"""
+        from . import usage_report
+
+        minutes = 5.0
+        try:
+            minutes = float(self._config.get("usage_report_minutes", 5))
+        except (TypeError, ValueError):
+            pass
+        if minutes <= 0:
+            return  # 配置热改成关闭：不再重排，定时器自然消亡
+        # 门禁与自言自语同口径：设置页抑制期 / 审批气泡占用 / 隐藏中不弹，
+        # 但下一轮照常排（这是周期播报，不是错过的提醒）。
+        blocked = (self._bubble_blocked()
+                   or self._sticky_bubble_active
+                   or self._alert_current is not None
+                   or self.sprite is None
+                   or not self.sprite.isVisible())
+        text = None if blocked else usage_report.build_bubble_text()
+        if text is not None:
+            self._apply_bubble_interactive()
+            # 两边账单合并后文案较长：固定 6s 起步，不吃自言自语的 3.2s 时长
+            if not self._show_bubble_text(text, max(6000, int(
+                    self._self_talk_duration_seconds * 1000))):
+                text = None  # 气泡没弹出去（跟随器缺失等）：别影响重排节奏
+        self._usage_report_timer.start(
+            int(minutes * 60_000) if text is not None else 60_000)
+        # 弹出去了按整周期排；被门禁挡住/没弹出去 60s 后轻试（不精确补拍）
+
     def _load_self_talk_settings(self) -> None:
         """（重）读 self_talk 族配置字段。构造期由 _init_self_talk 调一次；
         运行期配置变更由 refresh_settings 再调——否则改开关/间隔/点击行为
@@ -3231,6 +3280,21 @@ class OverlayShell(QObject):
             return False
         return bool(window_alerts.show_click_self_talk(host, click_name))
 
+    def _show_usage_bubble_for(self, target) -> None:
+        """壳内直查 ZCode 用量并弹到**被点那只**头顶（AppShell 面缺失的回退）。
+
+        查询 <3ms（GUI 线程同步无感）；拿不到数据时弹一句轻提示而不是静默——
+        用户点了就要有回应。门禁（飞行/抑制）下直接不弹，与其它点击气泡同口径。
+        """
+        from . import usage_report
+
+        if self._bubble_blocked(target):
+            return
+        text = (usage_report.build_bubble_text()
+                or "今天两边的账单还都是空的……")
+        if text:
+            self._show_bubble_text_for(target, text, 6000)
+
     def _on_sprite_click(self, sprite, click_name: str) -> None:
         """单击 sprite 后的点击分支（``window.py:3370-3377`` 的 sprite 等价物）。
 
@@ -3267,6 +3331,15 @@ class OverlayShell(QObject):
             if callable(handler):
                 # 余额气泡锚在**被点那一只**的宿主上（主宠 = 壳本身，行为不变）
                 handler(self._sprite_host(target))
+        elif bool(cfg.get("click_show_usage", False)):
+            # ZCode 用量气泡：同余额的落点口径；AppShell 面缺失（测试替身等）
+            # 时回退壳内直查直弹——点击行为不能因宿主面不全而静默失效。
+            handler = getattr(getattr(self._instance, "shell", None),
+                              "show_usage_query", None)
+            if callable(handler):
+                handler(self._sprite_host(target))
+            else:
+                self._show_usage_bubble_for(target)
         elif bool(cfg.get("click_show_self_talk", False)):
             if self._show_click_self_talk(click_name, target):
                 self._schedule_self_talk_for(target, after_display=True)
@@ -4246,6 +4319,13 @@ class OverlayShell(QObject):
         # 活线程还会被一起析构（Qt fatal）。逐库显式取消（口径同 _on_session_end
         # 的逐库 stop_all_clips）。
         self._run_exit_step('取消在飞帧序列供给', self._cancel_frameseq_provisions)
+        self._run_exit_step('停用量播报', self._stop_usage_report)
+
+    def _stop_usage_report(self) -> None:
+        """退出收口：停掉用量播报定时器（单发 QTimer，随壳析构也安全）。"""
+        timer = getattr(self, "_usage_report_timer", None)
+        if timer is not None:
+            timer.stop()
 
     def _cancel_frameseq_provisions(self) -> None:
         """取消本路径各库的在飞帧序列供给线程（退出/会话结束收口，issue #111）。

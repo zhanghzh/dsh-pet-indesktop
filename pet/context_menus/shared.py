@@ -1619,6 +1619,20 @@ def add_monitor_sleep(menu: QMenu, pet, *, icons: bool = True):
     )
 
 
+def add_usage_query(menu: QMenu, pet, *, icons: bool = True):
+    """「Token 用量」：点一下立刻查（ZCode 本地库 + DSH 今日会话，<10ms）并气泡播报。
+
+    与定时播报（``OverlayShell._usage_report_timer``）共用同一份查询与文案
+    （``pet/usage_report.py``）；回调不存在（未来其它宿主变体）整条不出现，
+    与「网络信息」的回调能力门同款。
+    """
+    callback = getattr(pet, "on_usage_query", None)
+    if callback is None:
+        return None
+    return add_action(
+        menu, "Token 用量", "balance" if icons else None,
+        lambda: callback(pet), close_on_trigger=True,
+    )
 
 
 def open_deepseek_web() -> bool:

@@ -1186,6 +1186,7 @@ class Config:
             "idle_low_fps_enabled": False,  # 闲置降帧（灰度默认关）：长时间无交互时动画隔帧呈现
             "idle_low_fps_threshold": 30.0,  # 闲置阈值（秒）：超过该时长无交互且窗口可见才降帧
             "click_show_balance": False,  # 点击显示 DeepSeek 余额
+            "click_show_usage": False,  # 点击显示 Token 用量（ZCode + DSH 今日 token 与均速）
             "click_show_self_talk": False,  # 点击随机显示自定义自言自语
             "self_talk_speak_enabled": False,  # 点击自言自语同句朗读（复用语音报时音频通道，默认关）
             "self_talk_voice_precache_enabled": False,  # 台词/点击绑定本地语音预缓存（需本机 TTS 服务，默认关）
@@ -1551,6 +1552,7 @@ class Config:
             "idle_low_fps_enabled",
             "idle_low_fps_threshold",
             "click_show_balance",
+            "click_show_usage",
             "click_show_self_talk",
             "self_talk_speak_enabled",
             "self_talk_voice_precache_enabled",
