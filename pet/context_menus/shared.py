@@ -1600,6 +1600,27 @@ def add_memory_trim(menu: QMenu, pet, *, icons: bool = True):
     )
 
 
+def add_monitor_sleep(menu: QMenu, pet, *, icons: bool = True):
+    """「息屏」：显示器立即关断，键鼠一动 Windows 原生唤醒。
+
+    Windows 专属（非 Windows 整条不出现，与「回收内存」同款双门：注册表
+    available + builder 自守）。动作是进程级的系统广播（``SC_MONITORPOWER``），
+    与宿主状态无关，故不做回调能力门——PetWindow / SpriteMenuFacade 两侧
+    同一棵树天然 parity。时序与防抖（600ms 让手离开鼠标、熄屏后 2 秒内
+    补发按回误唤醒）收在 ``pet/monitor_sleep.py``。
+    """
+    from .. import monitor_sleep
+
+    if not monitor_sleep.is_supported():
+        return None
+    return add_action(
+        menu, "息屏", "screen" if icons else None,
+        monitor_sleep.trigger_monitor_sleep, close_on_trigger=True,
+    )
+
+
+
+
 def open_deepseek_web() -> bool:
     return bool(QDesktopServices.openUrl(QUrl(DEEPSEEK_WEB_URL)))
 

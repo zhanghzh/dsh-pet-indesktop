@@ -39,6 +39,7 @@ from .shared import (
     add_hide_pet,
     add_look_screen,
     add_memory_trim,
+    add_monitor_sleep,
     add_agent_cost,
     add_music_lyric_align,
     add_music_next,
@@ -85,7 +86,7 @@ ACTION_LABELS = {
     "music_lyric_align": "歌词对齐",
     "agent_cost": "显示本轮消费",
     "quick_launch": "快捷启动", "balance": "DeepSeek 余额",
-    "memory_trim": "回收内存",
+    "memory_trim": "回收内存", "monitor_sleep": "息屏",
     "harness": "启动 DeepSeek Harness", "deepseek_web": "打开网页版 DeepSeek",
     "check_update": "检查更新", "github_project": "GitHub 项目页",
     "quark_download": "夸克网盘下载", "agent_link": "Agent 联动",
@@ -116,7 +117,7 @@ ACTION_ICONS = {
     "music_open_qqmusic": "play", "music_open_kugou": "play",
     "music_open_soda": "play", "music_lyric_align": "play",
     "quick_launch": "application", "balance": "balance", "harness": "harness",
-    "memory_trim": "clear",
+    "memory_trim": "clear", "monitor_sleep": "screen",
     "deepseek_web": "web", "check_update": "update", "github_project": "web",
     "quark_download": "download", "agent_link": "automation",
     "proactive_screen": "screen", "todo_panel": "todo",
@@ -170,6 +171,18 @@ def _memory_trim_available(_pet) -> bool:
     from .. import memory_trim
 
     return memory_trim.is_supported()
+
+
+def _monitor_sleep_available(_pet) -> bool:
+    """「息屏」只对 Windows 显示：判定走 ``monitor_sleep.is_supported``。
+
+    与「回收内存」同一条纪律：菜单给不给看和执行能不能跑必须是同一个真相，
+    不另写一份 ``sys.platform`` 比较（builder 是注册表投影之外的第二条入口，
+    同样调 ``is_supported`` 自守）。
+    """
+    from .. import monitor_sleep
+
+    return monitor_sleep.is_supported()
 
 
 # 「查看天气 / 天气城市」的判据与原因文案收在共享建造器模块（`weather_menu`），
@@ -345,6 +358,12 @@ class MenuActionRegistry:
             # 平台门在 menu_layout 的 available_actions 过滤里生效（非 Windows
             # 整条不出现）；builder 自身也有同一道门，legacy 扁平布局直接调它。
             "memory_trim": MenuActionSpec(add_memory_trim, _memory_trim_available),
+            # 「息屏」：手动熄屏（SC_MONITORPOWER 广播，键鼠原生唤醒）。核心
+            # 动作不进任何可停用模块；平台门与「回收内存」同款（available +
+            # builder 双门，非 Windows 整条不出现）。
+            "monitor_sleep": MenuActionSpec(
+                add_monitor_sleep, _monitor_sleep_available,
+            ),
             "golden_spin": MenuActionSpec(
                 add_golden_spin,
                 _callback_available("trigger_golden_spin"),

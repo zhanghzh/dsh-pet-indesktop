@@ -97,6 +97,7 @@ from . import autostart as autostart_mod
 from . import catalog
 from . import click_sound
 from . import feature_activation
+from . import monitor_sleep
 from . import overlay_settings_command
 from . import overlay_spawn_state
 from . import slot_manager
@@ -7726,6 +7727,12 @@ class OverlayShell(QObject):
 
     # ---------------------------------------------------------------- 会话/电源（O4）
     def _install_session_watcher(self) -> None:
+        # 锁屏 3 分钟自动息屏：控制器与探测器同点建——它的唯一输入正是探测
+        # 器的 on_suspend_change 转发（见 _on_suspend_changed）。非 Windows
+        # 上不建（发不出 SC_MONITORPOWER，锁事件也没有），免留死定时器。
+        self._lock_monitor_sleep = (
+            monitor_sleep.LockMonitorSleep(self)
+            if monitor_sleep.is_supported() else None)
         try:
             self._session_watcher = install_session_watcher(
                 app=self.app, on_session_end=self._on_session_end,
@@ -7773,6 +7780,14 @@ class OverlayShell(QObject):
         打断 Qt 事件循环。
         """
         logging.info("overlay: 锁屏/挂起状态变化 active=%s reason=%s", active, reason)
+        # 锁屏自动息屏（息屏）：锁上 3 分钟后熄屏、保黑到解锁。单独 try——
+        # 它挂了也不能拖垮既有降档链（与下面的 driver/预热段互不影响）。
+        try:
+            controller = getattr(self, "_lock_monitor_sleep", None)
+            if controller is not None:
+                controller.on_suspend_change(bool(active), str(reason or ""))
+        except Exception:
+            logging.exception("overlay: 锁屏自动息屏处理失败")
         try:
             driver = getattr(self, "driver", None)
             if driver is not None:

@@ -2305,12 +2305,16 @@ def test_every_action_and_key_has_single_owner():
 #: 永远不被门控的核心动作白名单（ds 目录化排查 4.3 节登记的守卫盲区）：
 #: 新增菜单动作必须要么归进 features 清单、要么进这里——两边都不在就是
 #: 「漏登记 = 永不被门控」，这条守卫让它立刻红。改这份名单要带着理由改。
+#: 「息屏」（monitor_sleep）：进程级系统广播、键鼠由系统原生唤醒，没有可
+#: 停用的服务面，产品口径是常驻核心工具（Windows 专属由平台门表达）。
 CORE_MENU_ACTION_IDS = frozenset({
     "animations_hub", "autostart", "character", "check_update", "clear_spawned_pets",
     "deepseek_web", "drag_physics", "edge_probe", "github_project", "golden_spin",
-    "hide_pet", "modern_settings", "no_move", "ojingjing", "on_top", "playback_speed",
-    "quark_download", "quiet_mode", "quit", "return_corner", "size", "spawn_pet",
+    "hide_pet", "modern_settings", "monitor_sleep", "no_move", "ojingjing",
+    "on_top", "playback_speed", "quark_download", "quiet_mode", "quit",
+    "return_corner", "size", "spawn_pet",
 })
+
 
 
 def test_every_menu_action_is_owned_or_pinned_core():
