@@ -87,3 +87,15 @@ dist-android/
 
 # 素材包构建产物（发布门输出，发布到 Release 后即可删）
 dist-packs/
+
+# —— 本地部署运行产物（run.bat 把 APPDATA 重定向到 .\data；均不入库）——
+data/
+build_tmp/
+wheelhouse/
+shots/
+dsh-pet-thumbs/
+dsh-pet-media-meta-cache.json*
+pip-metadata-*/
+pip-unpack-*/
+fetch_wheels.py
+filtered-requirements.txt

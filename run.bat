@@ -1,7 +1,15 @@
 @echo off
 rem ============================================
-rem  dsh-pet 独立桌宠 —— 一键启动
-rem  （双击本文件即可；不弹出控制台窗口）
+rem  dsh-pet standalone pet - one-click launcher
+rem  (double-click to start; no console window)
+rem  Data dir redirected to .\data so config,
+rem  logs and caches stay inside this folder.
 rem ============================================
 cd /d "%~dp0"
-pythonw -m pet
+set "APPDATA=%~dp0data"
+if not exist "%APPDATA%" mkdir "%APPDATA%"
+if exist ".venv\Scripts\pythonw.exe" (
+    start "" ".venv\Scripts\pythonw.exe" -m pet
+) else (
+    start "" pythonw -m pet
+)
