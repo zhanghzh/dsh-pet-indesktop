@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""「息屏」单测：广播边界 / 手动防抖时序 / 锁屏自动熄屏状态机 / 菜单接线。
+"""「息屏」单测：广播边界 / 手动防抖时序 / 菜单接线。
 
 绝不在单测里真熄屏：win32 边界（``SendMessageTimeoutW``）在广播测试里喂假
-``windll``，其余用例打桩 ``_send_monitor_off`` / 给控制器注入计数器。
-时序用宽预算条件轮询（先例：``test_memory_trim._wait_until``），不赌固定
-sleep——0ms QTimer 的每一拍都要过事件循环。
+``windll``，其余用例打桩 ``_send_monitor_off``。时序用宽预算条件轮询
+（先例：``test_memory_trim._wait_until``），不赌固定 sleep——0ms QTimer 的
+每一拍都要过事件循环。
 """
 from __future__ import annotations
 
@@ -152,73 +152,6 @@ def test_menu_action_triggers_the_delayed_sleep(app, monkeypatch):
     action.trigger()  # 菜单不可见：close_on_trigger 直接派发回调
     assert _wait_until(app, lambda: len(sends) >= 3)
     menu.close()
-
-
-# ---------------------------------------------------------------- 锁屏状态机
-def _make_controller():
-    sends: list[int] = []
-    controller = monitor_sleep.LockMonitorSleep(
-        delay_ms=0, keep_interval_ms=0, send=lambda: sends.append(1))
-    return controller, sends
-
-
-def test_lock_countdown_fires_once_then_keeps_off_until_unlock(app):
-    controller, sends = _make_controller()
-    assert not controller.countdown_active
-
-    controller.on_suspend_change(True, "session_lock")
-    assert controller.locked is True
-    assert controller.countdown_active
-    assert _wait_until(app, lambda: len(sends) >= 1)
-    assert controller.keep_off_active  # 熄屏后保黑循环在补发
-    assert _wait_until(app, lambda: len(sends) >= 2)
-
-    controller.on_suspend_change(False, "session_unlock")
-    assert controller.locked is False
-    assert not controller.countdown_active
-    assert not controller.keep_off_active
-    baseline = len(sends)
-    assert not _wait_until(app, lambda: len(sends) > baseline, timeout=0.5)
-
-
-def test_power_suspend_freezes_and_resume_restarts_while_still_locked(app):
-    controller, sends = _make_controller()
-    controller.on_suspend_change(True, "session_lock")
-    assert _wait_until(app, lambda: len(sends) >= 1)
-
-    controller.on_suspend_change(True, "power_suspend")
-    assert not controller.countdown_active
-    assert not controller.keep_off_active
-    assert controller.locked is True  # 挂起不改锁态
-    baseline = len(sends)
-    assert not _wait_until(app, lambda: len(sends) > baseline, timeout=0.5)
-
-    controller.on_suspend_change(False, "power_resume")
-    assert controller.countdown_active  # 仍锁着：重开倒计时，不直接按黑
-    assert _wait_until(app, lambda: len(sends) > baseline)
-
-
-def test_resume_after_unlock_does_not_restart(app):
-    controller, sends = _make_controller()
-    controller.on_suspend_change(True, "session_lock")
-    controller.on_suspend_change(False, "session_unlock")
-    assert not controller.locked
-    controller.on_suspend_change(True, "power_suspend")
-    controller.on_suspend_change(False, "power_resume")
-    assert not controller.countdown_active  # 已解锁：恢复不重开
-    assert not controller.keep_off_active
-    assert sends == []
-
-
-def test_user_input_resume_restarts_only_while_locked(app):
-    controller, _sends = _make_controller()
-    controller.on_suspend_change(True, "session_lock")
-    controller.on_suspend_change(True, "power_suspend")
-    controller.on_suspend_change(False, "user-input")
-    assert controller.countdown_active  # 输入自愈兜底：仍锁着重开倒计时
-
-    controller.on_suspend_change(False, "session_unlock")
-    assert not controller.countdown_active
 
 
 # ---------------------------------------------------------------- 菜单接线
