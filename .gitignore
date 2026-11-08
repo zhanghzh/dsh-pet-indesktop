@@ -99,3 +99,4 @@ pip-metadata-*/
 pip-unpack-*/
 fetch_wheels.py
 filtered-requirements.txt
+pytest-of-*/
