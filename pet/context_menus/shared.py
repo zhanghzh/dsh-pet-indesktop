@@ -1619,24 +1619,6 @@ def add_monitor_sleep(menu: QMenu, pet, *, icons: bool = True):
     )
 
 
-def add_window_pin(menu: QMenu, pet, *, icons: bool = True):
-    """「图钉置顶」：进入图钉模式，点哪个窗口哪个窗口置顶/取消（DeskPins 同类）。
-
-    Windows 专属（与「息屏」同款双门）。动作是模式切换（覆盖窗生命周期收在
-    ``pet/window_pin.py``），零常驻开销；反馈气泡经宿主 ``show_bubble`` 落地，
-    构建期不做宿主属性访问——PetWindow / SpriteMenuFacade 两侧 parity 不受影响。
-    原生 SetWindowPos 被安全软件按二进制拒绝时走 PS 桥，再拒则气泡如实上报。
-    """
-    from .. import window_pin
-
-    if not window_pin.is_supported():
-        return None
-    return add_action(
-        menu, "图钉置顶", "pin" if icons else None,
-        lambda: window_pin.trigger_pin_mode(pet), close_on_trigger=True,
-    )
-
-
 def add_usage_query(menu: QMenu, pet, *, icons: bool = True):
     """「Token 用量」：点一下立刻查（ZCode 本地库 + DSH 今日会话，<10ms）并气泡播报。
 

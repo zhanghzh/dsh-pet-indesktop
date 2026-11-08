@@ -40,7 +40,6 @@ from .shared import (
     add_look_screen,
     add_memory_trim,
     add_monitor_sleep,
-    add_window_pin,
     add_usage_query,
     add_agent_cost,
     add_music_lyric_align,
@@ -88,7 +87,7 @@ ACTION_LABELS = {
     "music_lyric_align": "歌词对齐",
     "agent_cost": "显示本轮消费",
     "quick_launch": "快捷启动", "balance": "DeepSeek 余额",
-    "memory_trim": "回收内存", "monitor_sleep": "息屏", "window_pin": "图钉置顶",
+    "memory_trim": "回收内存", "monitor_sleep": "息屏",
     "usage_query": "Token 用量",
     "harness": "启动 DeepSeek Harness", "deepseek_web": "打开网页版 DeepSeek",
     "check_update": "检查更新", "github_project": "GitHub 项目页",
@@ -120,7 +119,7 @@ ACTION_ICONS = {
     "music_open_qqmusic": "play", "music_open_kugou": "play",
     "music_open_soda": "play", "music_lyric_align": "play",
     "quick_launch": "application", "balance": "balance", "harness": "harness",
-    "memory_trim": "clear", "monitor_sleep": "screen", "window_pin": "pin",
+    "memory_trim": "clear", "monitor_sleep": "screen",
     "usage_query": "balance",
     "deepseek_web": "web", "check_update": "update", "github_project": "web",
     "quark_download": "download", "agent_link": "automation",
@@ -187,12 +186,6 @@ def _monitor_sleep_available(_pet) -> bool:
     from .. import monitor_sleep
 
     return monitor_sleep.is_supported()
-
-
-def _window_pin_available(_pet) -> bool:
-    """「图钉置顶」仅 Windows：SetWindowPos/WindowFromPoint 是 win32 API。"""
-    from .. import window_pin
-    return window_pin.is_supported()
 
 
 # 「查看天气 / 天气城市」的判据与原因文案收在共享建造器模块（`weather_menu`），
@@ -373,9 +366,6 @@ class MenuActionRegistry:
             # builder 双门，非 Windows 整条不出现）。
             "monitor_sleep": MenuActionSpec(
                 add_monitor_sleep, _monitor_sleep_available,
-            ),
-            "window_pin": MenuActionSpec(
-                add_window_pin, _window_pin_available,
             ),
             "usage_query": MenuActionSpec(
                 add_usage_query, _callback_available("on_usage_query"),
