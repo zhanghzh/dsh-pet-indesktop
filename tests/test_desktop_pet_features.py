@@ -911,6 +911,7 @@ def test_modern_context_menu_has_compact_semantic_groups(monkeypatch):
     if sys.platform == "win32":
         expected_labels.append("回收内存")  # 「回收内存」菜单动作（#210）：仅 Windows
         expected_labels.append("息屏")  # 「息屏」菜单动作：仅 Windows（SC_MONITORPOWER 广播）
+        expected_labels.append("图钉置顶")  # 「图钉置顶」菜单动作：仅 Windows（DeskPins 同类）
     expected_labels.extend(["查看天气", "天气城市"])  # 天气入口（issue #209，所有平台）
     expected_labels.append("抽支签")  # 每日一签（2026-10-15；设置入口在「互动 · 趣味」标签）
     # 立即报时/语音报时开关/今日节日/节日提醒开关：2026-09-19 起默认模板

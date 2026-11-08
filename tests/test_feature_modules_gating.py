@@ -2309,10 +2309,13 @@ def test_every_action_and_key_has_single_owner():
 #: 停用的服务面，产品口径是常驻核心工具（Windows 专属由平台门表达）。
 #: 「Token 用量」（usage_query）：查询型动作（ZCode 库 + DSH 会话），同样无
 #: 服务面，随 ZCode 用量功能按核心接入。
+#: 「图钉置顶」（window_pin）：一次性覆盖窗 + Win32 切换，无常驻服务面，
+#: Windows 专属由平台门表达（与「息屏」同款核心口径）。
 CORE_MENU_ACTION_IDS = frozenset({
     "animations_hub", "autostart", "character", "check_update", "clear_spawned_pets",
     "deepseek_web", "drag_physics", "edge_probe", "github_project", "golden_spin",
     "hide_pet", "modern_settings", "monitor_sleep", "no_move", "ojingjing",
+    "window_pin",
     "on_top", "playback_speed", "quark_download", "quiet_mode", "quit",
     "return_corner", "size", "spawn_pet", "usage_query",
 })

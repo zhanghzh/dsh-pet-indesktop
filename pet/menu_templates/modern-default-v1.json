@@ -70,6 +70,7 @@
     {"type": "action", "id": "quiet_mode", "visible": true, "section": "tools"},
     {"type": "action", "id": "memory_trim", "visible": true, "section": "tools"},
     {"type": "action", "id": "monitor_sleep", "visible": true, "section": "tools"},
+    {"type": "action", "id": "window_pin", "visible": true, "section": "tools"},
     {"type": "action", "id": "weather", "visible": true, "section": "tools"},
     {"type": "action", "id": "weather_cities", "visible": true, "section": "tools"},
     {"type": "action", "id": "voice_chime_now", "visible": false, "section": "tools"},
