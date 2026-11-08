@@ -4822,7 +4822,7 @@ class AppShell:
         from . import usage_report
 
         text = (usage_report.build_bubble_text()
-                or "今天两边的账单还都是空的……")
+                or "今天几边的账单还都是空的……")
         if text:
             # 延迟到事件循环空闲：菜单触发器销毁期间冒泡在 macOS 上会被吞
             # （与 show_balance 的 singleShot(0) 同一款规避）。

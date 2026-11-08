@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""读 ZCode / DeepSeek Harness (DSH) 各自的用量记录，变成桌宠的碎碎念。
+"""读 ZCode / DeepSeek Harness (DSH) / Claude Code 各自的用量记录，变成桌宠的碎碎念。
 
 **ZCode 数据从哪来**：ZCode CLI 把每次模型请求的用量落进
 ``~/.zcode/cli/db/db.sqlite`` 的 ``model_usage`` 表（输入/输出/思考/缓存各分项、
@@ -14,12 +14,19 @@ per-message ``usage``（uncached/cacheRead/output/totalTokens），``step/start`
 汇出"今天"——比起 dsh-archive-manager 插件的 ``session_projcache``（JSON 明文
 但只有会话生命周期合计），这条路多付一次 zstd 解压（~1MB，毫秒级）换按天精确。
 
+**Claude Code 数据从哪来**：``~/.claude/projects/<工作区>/<sessionId>.jsonl``
+（明文 JSONL，无需解压）：``assistant`` 行的 ``message.usage`` 带精确 token
+分项，顶层 ``timestamp`` 是 ISO 字符串。同样是"只扫今天有写入的文件 + 按行
+时间切天"；会话级 ``cost-state`` 聚合行（带费用/总时长）是生命周期累计值，
+跨天切不开，不用（详见 :func:`claude_query_usage`）。
+
 **为什么敢在 GUI 线程同步查**：ZCode 侧实测汇总 0.9ms；DSH 侧解压+解析今天
 活跃会话实测 <10ms——都比一帧 16ms 预算小。ZCode 连接仍上双保险
 （``timeout=0.2`` + ``busy_timeout``），宁可这一轮不报也不让桌宠卡一帧。
 
 **失败语义**：库不存在（没装 ZCode）/表缺失/查询抛错 → ZCode 半边 None；
-``~/.dsh`` 不存在 / 没有 zstandard / 解析失败 → DSH 半边 None。两半各自独立，
+``~/.dsh`` 不存在 / 没有 zstandard / 解析失败 → DSH 半边 None；
+``~/.claude`` 不存在 / 今天没有活跃会话 → Claude 半边 None。三半各自独立，
 任何一边失败都只影响自己那段文案。碎碎念是装饰，绝不因为装饰报错或拖慢桌宠。
 
 **口径**（两边一致）：
@@ -253,11 +260,104 @@ def dsh_query_usage() -> dict | None:
     }
 
 
-def build_bubble_text() -> str | None:
-    """查一次 ZCode + DSH 的今日用量，拼成碎碎念文案；两边都没数据 → None。
+#: Claude Code 会话流水根目录（``%USERPROFILE%/.claude/projects``）。
+CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
-    一边有就只播那边；两边都有则并成一句（气泡按 6 秒展示，见调用方）。
-    口吻对齐现有 self_talk_texts（"……" 收尾）。
+
+def _claude_today_files(day0_ms: int) -> list[Path]:
+    """今天有写入的 Claude Code 会话文件（``mtime ≥ 今日零点``）。"""
+    root = CLAUDE_PROJECTS_DIR
+    if not root.is_dir():
+        return []
+    out = []
+    for f in root.glob("*/*.jsonl"):
+        try:
+            if f.stat().st_mtime * 1000 >= day0_ms:
+                out.append(f)
+        except OSError:
+            continue
+    return out
+
+
+def claude_query_usage() -> dict | None:
+    """Claude Code 今天的 token 用量；拿不到 → None。
+
+    数据在 ``~/.claude/projects/<工作区>/<sessionId>.jsonl``（**明文 JSONL**，
+    无需解压）：``assistant`` 行的 ``message.usage`` 带精确 token 分项
+    （``input_tokens`` / ``output_tokens`` / ``cache_read_input_tokens``），
+    顶层 ``timestamp`` 是 ISO 字符串。按行时间精确切出「今天」。
+
+    **为什么不用 cost-state**：那个聚合行带 ``totalCostUSD`` / 按模型分项 /
+    ``totalAPIDuration``，看着很全，但它是**会话生命周期累计值**且不随时间
+    重发更新——跨天会话切不开（与 dsh-archive-manager 的 projcache 同一个坑）。
+    assistant 行每条独立带时间戳，是唯一能按天精确归组的层。
+
+    **为什么没有均速**：ZCode 有 per-请求 ``duration_ms``、DSH 有 step/start~end
+    配对，Claude 的 assistant 行只有 ``thinkingDurationMs``（思考**展示**时长，
+    不是 API 全程耗时）——单行拿不到可靠的耗时分母，硬凑会系统性偏高。总量
+    照报，速度段缺席不占坑（与两边"今天还没跑完过活"同语义）。
+
+    ``~/.claude`` 不存在 / 今天没有活跃会话 → None（这半边静默缺席）。
+    """
+    day0 = _day_start_ms()
+    files = _claude_today_files(day0)
+    if not files:
+        return None
+    total = output = n = 0
+    try:
+        for f in files:
+            try:
+                with open(f, encoding="utf-8", errors="replace") as fh:
+                    for line in fh:
+                        try:
+                            obj = json.loads(line)
+                        except ValueError:
+                            continue
+                        if obj.get("type") != "assistant":
+                            continue
+                        ts = obj.get("timestamp")
+                        if not isinstance(ts, str):
+                            continue
+                        try:
+                            t = datetime.datetime.fromisoformat(
+                                ts.replace("Z", "+00:00")).timestamp() * 1000
+                        except ValueError:
+                            continue
+                        if t < day0:
+                            continue
+                        msg = obj.get("message")
+                        usage = msg.get("usage") if isinstance(msg, dict) else None
+                        if not isinstance(usage, dict):
+                            continue
+                        out_tok = int(usage.get("output_tokens") or 0)
+                        in_tok = int(usage.get("input_tokens") or 0)
+                        cache = int(usage.get("cache_read_input_tokens") or 0)
+                        total += out_tok + in_tok + cache
+                        output += out_tok
+                        if out_tok or in_tok or cache:
+                            n += 1
+            except OSError:
+                logger.debug("usage_report: Claude 会话读取失败 %s", f,
+                             exc_info=True)
+                continue
+    except Exception:  # noqa: BLE001 —— 装饰功能，任何意外都整半边放弃
+        logger.debug("usage_report: Claude 用量解析失败", exc_info=True)
+        return None
+    if n <= 0:
+        return None
+    return {
+        "today_total": total,
+        "today_output": output,
+        "today_messages": n,
+    }
+
+
+def build_bubble_text() -> str | None:
+    """查一次 ZCode + DSH + Claude Code 的今日用量，拼成碎碎念文案。
+
+    全都没数据 → None（不播）；只有一边就只播那边（不带"账单"导语）；
+    两边及以上并成一句（气泡 6s 起步，见调用方）。口吻对齐现有
+    self_talk_texts（"……" 收尾）。
     """
     parts = []
     zc = query_usage()
@@ -274,11 +374,18 @@ def build_bubble_text() -> str | None:
         if dsh["today_avg_tps"] is not None:
             seg += f"，今日平均输出 {dsh['today_avg_tps']:.1f} tok/s"
         parts.append(seg)
+    cc = claude_query_usage()
+    if cc:
+        seg = (f"Claude Code 写了 {cc['today_messages']} 条回复、"
+               f"{_format_tokens(cc['today_total'])} token")
+        parts.append(seg)
     if not parts:
         return None
     if len(parts) == 1:
         return parts[0] + "，休息一下眼睛呀……"
-    return "今天两边的账单：" + "；".join(parts) + "。休息一下眼睛呀……"
+    return "今天几边的账单：" + "；".join(parts) + "。休息一下眼睛呀……"
 
 
-__all__ = ["DB_PATH", "query_usage", "build_bubble_text", "_format_tokens"]
+__all__ = ["DB_PATH", "DSH_SESSIONS_DIR", "CLAUDE_PROJECTS_DIR",
+           "query_usage", "dsh_query_usage", "claude_query_usage",
+           "build_bubble_text", "_format_tokens"]
